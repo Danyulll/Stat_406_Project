@@ -1,0 +1,106 @@
+---
+title: "Grid Search attempt"
+format: html
+editor: visual
+---
+
+```{r}
+# Create all combinations of true and false for 10 variables
+zig <- expand.grid(replicate(10, c(1, 0), simplify = FALSE))
+```
+
+```{r}
+x <- 1:12 # 12 months
+l <- 1 # TODO should be grid search from 1 to 2
+s <- 1 # assumption
+```
+
+```{r}
+# SE Kernel Calculation
+covarK <- function(x, l, s=1){
+  len = length(x)
+  K = matrix(NA, nrow=len, ncol=len)
+  for(i in 1:len){
+    for(j in 1:len){
+      K[i,j] = (s^2)*exp(((-1)/(2*(l^2)))*((x[i]-x[j])^2))
+    }
+  }
+  K
+}
+K <- covarK(x,1,1)
+# library(geoR)
+# # Set seed for reproducibility
+# se_kernel <- function(x, y, sigma2, ell) {
+#   return(sigma2 * exp(-(x - y)^2 / (2 * ell^2)))
+# }
+
+# Define parameters
+range_param <- 1
+sill_param <- 1
+
+# Create a grid of points
+# x <- seq(0, 10, length.out = 5)
+
+# Calculate the SE covariance kernel for all pairs of points
+# K <- outer(x, x, Vectorize(function(x, y) se_kernel(x, y, sill_param, range_param)))
+
+```
+
+```{r}
+library(FastGP)
+library(matlib)
+# K^-1 via cholesky
+invert_K <- function(K) {
+  L <- rcppeigen_get_chol(K)
+  # L_inv <- inv(L)
+  L_inv <- rcppeigen_invert_matrix(L)
+  K_inv <- t(L_inv) %*% L_inv
+  K_inv %*% K
+}
+```
+
+
+```{r}
+# l grad-ascent update
+set.seed(123456)
+y <- rnorm(12) # precips
+t <- 10000
+len = length(x)
+l_cur <- 1
+l_prev <- 1
+lambda <- 0.1
+for (i in 1:t) {
+  
+  K <- covarK(x, l_cur, 1)
+  K_inv <- invert_K(K)
+  # K_inv <- inv(K)
+  alpha <-  K_inv %*% y
+  
+  dKdl = matrix(NA, nrow = len, ncol = len)
+  for (i in 1:len) {
+    for (j in 1:len) {
+      if (i == j) {
+        dKdl[i, j] = 0.01
+      } else{
+        dist <- ((x[i] - x[j]) ^ 2)
+        dKdl[i, j] = (1 ^ 2) * exp(((-1) / (2 * (l_cur ^ 2))) * dist) * dist *
+          (l_cur ^ (-3))
+      }
+    }
+  }
+  # print(dKdl)
+  derive <- 0.5 * tr((alpha %*% t(alpha) - K_inv) %*% dKdl)
+  # print((alpha %*% t(alpha) - K_inv))
+  # print(derive)
+  l_prev <- l_cur
+  l_cur <- l_prev + lambda * derive
+  # print(l_cur)
+  
+}
+l_cur
+```
+
+TODO continute from loglikelihood and doing grid search stuff
+
+
+
