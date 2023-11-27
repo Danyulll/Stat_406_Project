@@ -27,7 +27,7 @@ covarK <- function(x, l, s=1){
   }
   K
 }
-K <- covarK(x,1,1)
+#K <- covarK(x,1,1)
 # library(geoR)
 # # Set seed for reproducibility
 # se_kernel <- function(x, y, sigma2, ell) {
@@ -35,8 +35,8 @@ K <- covarK(x,1,1)
 # }
 
 # Define parameters
-range_param <- 1
-sill_param <- 1
+#range_param <- 1
+#sill_param <- 1
 
 # Create a grid of points
 # x <- seq(0, 10, length.out = 5)
@@ -59,7 +59,6 @@ invert_K <- function(K) {
 }
 ```
 
-
 ```{r}
 # l grad-ascent update
 set.seed(123456)
@@ -80,7 +79,7 @@ for (i in 1:t) {
   for (i in 1:len) {
     for (j in 1:len) {
       if (i == j) {
-        dKdl[i, j] = 0.01
+        dKdl[i, j] = 0.001
       } else{
         dist <- ((x[i] - x[j]) ^ 2)
         dKdl[i, j] = (1 ^ 2) * exp(((-1) / (2 * (l_cur ^ 2))) * dist) * dist *
@@ -100,7 +99,43 @@ for (i in 1:t) {
 l_cur
 ```
 
-TODO continute from loglikelihood and doing grid search stuff
+Function for Gradient Ascent:
 
+```{r}
+grad-ascent <- function(start_l, iter){
+  # l grad-ascent update
+  set.seed(123456)
+  y = y # precips
+  t <- iter
+  len = length(x)
+  l_cur <- start_l
+  lambda <- 0.1
+  for (i in 1:t) {
+    K <- covarK(x, l_cur, 1)
+    K_inv <- invert_K(K)
+    alpha <-  K_inv %*% y
+    dKdl = matrix(NA, nrow = len, ncol = len)
+    for (i in 1:len) {
+      for (j in 1:len) {
+        if (i == j) {
+          dKdl[i, j] = 0.001
+        } else{
+          dist <- ((x[i] - x[j]) ^ 2)
+          dKdl[i, j] = (1 ^ 2) * exp(((-1) / (2 * (l_cur ^ 2))) * dist) * dist *
+            (l_cur ^ (-3))
+        }
+      }
+    }
+    derive <- 0.5 * tr((alpha %*% t(alpha) - K_inv) %*% dKdl)
+    l_prev <- l_cur
+    l_cur <- l_prev + lambda * derive
+  }
+  return(l_cur)
+}
+```
 
+TODO: apply grad-ascent function to l in \[0,2\]
 
+```{r}
+l_range = rep()
+```
