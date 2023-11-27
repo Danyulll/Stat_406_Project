@@ -102,11 +102,11 @@ l_cur
 Function for Gradient Ascent:
 
 ```{r}
-grad-ascent <- function(start_l, iter){
+gradascent <- function(start_l){
   # l grad-ascent update
   set.seed(123456)
   y = y # precips
-  t <- iter
+  t <- 10000
   len = length(x)
   l_cur <- start_l
   lambda <- 0.1
@@ -134,8 +134,12 @@ grad-ascent <- function(start_l, iter){
 }
 ```
 
-TODO: apply grad-ascent function to l in \[0,2\]
+Apply grad-ascent to l in range \[0,2\]:
 
 ```{r}
-l_range = rep()
+l_range = seq(0.01,0.05,0.01)
+l_range = data.frame(l_range)
+l = gradascent(0.01) #works
+#TODO fix rapply
+results = rapply(l_range, gradascent) #broken??
 ```
