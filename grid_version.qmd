@@ -137,9 +137,14 @@ gradascent <- function(start_l){
 Apply grad-ascent to l in range \[0,2\]:
 
 ```{r}
-l_range = seq(0.01,0.05,0.01)
-l_range = data.frame(l_range)
-l = gradascent(0.01) #works
-#TODO fix rapply
-results = rapply(l_range, gradascent) #broken??
+# l_range = seq(0.01,0.05,0.01))
+# # l_range = data.frame(l_range)
+# l = gradascent(0.01) #works
+# #TODO fix rapply
+# results = lapply(l_range, gradascent) #broken??
+
+res <- numeric(0)
+for (i in seq(0.01,1,0.01)) {
+  res <- c(res,gradascent(i))
+}
 ```
