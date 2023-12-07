@@ -195,6 +195,8 @@ L = seq(from=0, to=2, by=0.01)
 load("./L_opts/van_l_opt.RData")
 
 
+
+
 # port hardy l_opt
 
 port_h <- read.csv( "./Port_Hardy_A.csv") %>% 
@@ -236,6 +238,15 @@ L = seq(from=0, to=2, by=0.01)
 # loads in ph_l_opt
 load("./L_opts/ph_l_opt.RData")
 
+as.data.frame(ph_l_opt) |> na.omit() -> ph_l_opt_df
+
+colnames(ph_l_opt_df) <- ph_l_opt_df[1,]
+ph_l_opt_df <- ph_l_opt_df[-1,]
+idx <- which.max(ph_l_opt_df$Likelihood)
+ph_l_opt_df[idx,]
+
+plot(1:nrow(ph_l_opt_df),ph_l_opt_df$Likelihood)
+
 # victoria l_opt
 
 victoria <- read.csv( "data/Victoria_International_Airport.csv") %>% 
@@ -276,6 +287,16 @@ vic_seasoned <- (victoria - rowMeans(victoria)) %>%
 # loads in vic_l_opt
 load("./L_opts/vic_l_opt.RData")
 
+as.data.frame(vic_l_opt) |> na.omit() -> vic_l_opt_df
+
+colnames(vic_l_opt_df) <- vic_l_opt_df[1,]
+vic_l_opt_df <- vic_l_opt_df[-1,]
+idx <- which.max(vic_l_opt_df$Likelihood)
+vic_l_opt_df[idx,]
+
+subset(vic_l_opt_df,year==1992)
+
+plot(1:nrow(vic_l_opt_df),vic_l_opt_df$Likelihood)
 
 
 
@@ -314,18 +335,6 @@ load("./L_opts/vic_l_opt.RData")
 
 
 
-
-
-
-
-
-van_l_opt 
-
-
-port_l_opt 
-
-
-vic_l_opt
 
 # load optimized HP l scales:
 # load("optimizedhp.RData")

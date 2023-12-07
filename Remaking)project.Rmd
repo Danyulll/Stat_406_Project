@@ -112,8 +112,11 @@ log_like_mixture <- function(data_1, N, K, t, l_1, l_2, pi_1, pi_2, s_1, s_2){
   zz <- sum(log(pi_1*like_1 + pi_2*like_2))
   return(zz)
 }
+```
 
 
+
+```{r}
 ################################################################
 ############# Calculate Optimal Ls #############################
 ################################################################
@@ -139,7 +142,7 @@ tofino_seasoned <- (gp_data_rain - rowMeans(gp_data_rain)) %>%
   scale() %>% as.data.frame()
 
 # tofino l_opt
-tofino_l_opt <-  c("Year","L_start", "L_final", "S", "Likelihood")
+l_opt_df <-  c("Year","L_start", "L_final", "S", "Likelihood")
 L = seq(from=1, to=2, by=0.01)
 # for (year in colnames(tofino_seasoned)) {
 #   for(i in L){
@@ -164,6 +167,33 @@ L = seq(from=1, to=2, by=0.01)
 # loads in tofino_l_opt
 load("./L_opts/tofino_l_opt.RData")
 
+format_data_for_l_final_vis <- function(l_opt_vec){
+  as.data.frame(l_opt_vec) |> na.omit() -> l_opt_df
+
+colnames(l_opt_df) <- l_opt_df[1,]
+l_opt_df <- l_opt_df[-1,]
+
+l_opt_df$Likelihood <- as.numeric(l_opt_df$Likelihood,3)
+l_opt_df$L_start <- as.numeric(l_opt_df$L_start)
+l_opt_df$L_final <- as.numeric(l_opt_df$L_final)
+l_opt_df <-  subset(l_opt_df, L_final <= 2 & Likelihood <= 10 & L_final >= 0)
+
+
+l_opt_df %>%
+  group_by(Year) %>%
+  slice(which.max(Likelihood)) %>%
+  summarize(optimal_L = first(L_final),
+            max_likelihood = max(Likelihood)) -> l_opt_vis
+
+l_opt_vis
+
+# plot(optimal_L~Year,tofino_l_opt_vis)
+}
+
+tofino_l_opt_vis <- format_data_for_l_final_vis(tofino_l_opt)
+```
+
+```{r}
 # vancouver l_opt
 
 van <- read.csv( "./Vancouver_International_Airport.csv") %>% 
@@ -205,9 +235,10 @@ L = seq(from=0, to=2, by=0.01)
 # loads in van_l_opt
 load("./L_opts/van_l_opt.RData")
 
+van_l_opt_vis <- format_data_for_l_final_vis(van_l_opt)
+```
 
-
-
+```{r}
 # port hardy l_opt
 
 port_h <- read.csv( "./Port_Hardy_A.csv") %>% 
@@ -249,27 +280,22 @@ L = seq(from=0, to=2, by=0.01)
 # loads in ph_l_opt
 load("./L_opts/ph_l_opt.RData")
 
-as.data.frame(ph_l_opt) |> na.omit() -> ph_l_opt_df
+ph_l_opt_vis <- format_data_for_l_final_vis(ph_l_opt)
+```
 
-colnames(ph_l_opt_df) <- ph_l_opt_df[1,]
-ph_l_opt_df <- ph_l_opt_df[-1,]
-idx <- which.max(ph_l_opt_df$Likelihood)
-ph_l_opt_df[idx,]
-
-plot(1:nrow(ph_l_opt_df),ph_l_opt_df$Likelihood)
-
+```{r}
 # victoria l_opt
 
-victoria <- read.csv( "data/Victoria_International_Airport.csv") %>% 
-  dplyr::select(Date.Time, Year, Month, Total.Rain..mm.) %>% 
-  mutate(Date.Time = paste0(Date.Time, "-1")) %>% 
-  mutate(Date.Time = myd(Date.Time) ) %>% 
-  filter(Year %in% years1) %>% 
-  dplyr::select(Total.Rain..mm., Year, Month) %>% 
-  spread(Year, Total.Rain..mm.) %>% dplyr::select(-Month) 
-
-vic_seasoned <- (victoria - rowMeans(victoria)) %>% 
-  scale() %>% as.data.frame()
+# victoria <- read.csv( "data/Victoria_International_Airport.csv") %>% 
+#   dplyr::select(Date.Time, Station, Month, Total.Rain..mm.) %>% 
+#   mutate(Date.Time = paste0(Date.Time, "-1")) %>% 
+#   mutate(Date.Time = myd(Date.Time) ) %>% 
+#   filter(Station %in% years1) %>% 
+#   dplyr::select(Total.Rain..mm., Station, Month) %>% 
+#   spread(Station, Total.Rain..mm.) %>% dplyr::select(-Month) 
+# 
+# vic_seasoned <- (victoria - rowMeans(victoria)) %>% 
+#   scale() %>% as.data.frame()
 
 # vic_l_opt <-  c("Year","L_start", "L_final", "S", "Likelihood")
 # L = seq(from=0, to=2, by=0.01)
@@ -298,16 +324,58 @@ vic_seasoned <- (victoria - rowMeans(victoria)) %>%
 # loads in vic_l_opt
 load("./L_opts/vic_l_opt.RData")
 
-as.data.frame(vic_l_opt) |> na.omit() -> vic_l_opt_df
+vic_l_opt_vis <- format_data_for_l_final_vis(vic_l_opt)
+```
+# Visualization Code
+```{r}
+vis_df <- rbind(vic_l_opt_vis,ph_l_opt_vis,van_l_opt_vis,tofino_l_opt_vis)
+vis_df <-
+  cbind(vis_df, data.frame("Station" = c(
+    rep("Victoria", 10),
+    rep("Port Hardy", 10),
+    rep("Vancouver", 10),
+    rep("Tofino", 10)
+  )))
 
-colnames(vic_l_opt_df) <- vic_l_opt_df[1,]
-vic_l_opt_df <- vic_l_opt_df[-1,]
-idx <- which.max(vic_l_opt_df$Likelihood)
-vic_l_opt_df[idx,]
 
-subset(vic_l_opt_df,year==1992)
+vis_df$Year <-  factor(vis_df$Year)
+# Assigning colors and symbols based on the 'group' variable
+colors <- c("red", "green", "blue", "yellow")
+symbols <- c(1, 2, 3, 4)
 
-plot(1:nrow(vic_l_opt_df),vic_l_opt_df$Likelihood)
+# Create an empty plot
+plot(1, type = "n", xlim = c(1, length(unique(vis_df$Year))), ylim = c(0,max(vis_df$optimal_L)+0.5),
+     xlab = "X-axis label", ylab = "Y-axis label", main = "Categorical Plot with Lines and Symbols")
+
+# Loop through unique values of 'group'
+i <-  0
+for (grp in unique(vis_df$Station)) {
+  i <- i + 1
+  subset_data <- vis_df[vis_df$Station == grp, ]
+  
+  # Plot points
+  points(subset_data$Year, subset_data$optimal_L, pch = symbols[i], col = colors[i])
+  
+  # Connect points with lines
+  lines(subset_data$Year, subset_data$optimal_L, type = "b", col = colors[i])
+}
+
+# Add legend
+legend("topright", legend = levels(as.factor(vis_df$Station)), pch = symbols, col = colors)
+
+```
+
+
+```{r}
+
+```
+
+
+
+
+
+
+```{r}
 
 
 
