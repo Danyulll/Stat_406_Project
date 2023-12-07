@@ -111,6 +111,7 @@ gradascent <- function(start_l){
   l_cur <- start_l
   lambda <- 0.1
   for (i in 1:t) {
+    l_prev <- l_cur
     K <- covarK(x, l_cur, 1)
     K_inv <- invert_K(K)
     alpha <-  K_inv %*% y
@@ -127,7 +128,7 @@ gradascent <- function(start_l){
       }
     }
     derive <- 0.5 * tr((alpha %*% t(alpha) - K_inv) %*% dKdl)
-    l_prev <- l_cur
+    
     l_cur <- l_prev + lambda * derive
   }
   return(l_cur)
@@ -144,7 +145,11 @@ Apply grad-ascent to l in range \[0,2\]:
 # results = lapply(l_range, gradascent) #broken??
 
 res <- numeric(0)
-for (i in seq(0.01,1,0.01)) {
+for (i in seq(0.01,0.05,0.01)) {
   res <- c(res,gradascent(i))
 }
+res
 ```
+
+
+
