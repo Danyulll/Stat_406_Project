@@ -1,0 +1,224 @@
+---
+title: "Modified EM"
+author: "Keiran Malott 90426248"
+date: "2023-12-07"
+output: pdf_document
+---
+
+```{r}
+pacman::p_load(dplyr, tidyr, stringr, ggplot2, lubridate, mvtnorm, latex2exp, 
+               FastGP, psych, NMOF, gtools, ggrepel)
+```
+
+
+## Necessary Functions
+
+```{r}
+# compute covariance matrix
+get_sigmad <- function(K, x, h, l){
+  Sigma <- sapply(x, function(s1) {
+    sapply(x, function(s2) {
+      K(s1, s2, h, l)
+    })
+  })
+  return(Sigma)
+}
+```
+
+```{r}
+K <- function(xi, xj, sigma_f, l) {
+  return((sigma_f^2)*exp((-1/(2*l^2))*((xi-xj)^2) ))
+}
+```
+
+```{r}
+# log like
+log_like_mixture <- function(data_1, N, K, t, l_1, l_2, pi_1, pi_2, s_1, s_2){
+  # calculates log likelihood
+  # need dataframe, 
+  # N=number of realizations, 
+  # K=kernel, and parameters
+  pi_1 <- pi_1
+  pi_1 <- pi_1
+  l_1  <- l_1
+  l_2  <- l_2
+  s_1  <- s_1
+  s_2  <- s_2
+  
+  like_1 <- apply(data_1, MARGIN = 2, dmvnorm, mean = rep(0, N), 
+                  sigma = get_sigmad(K, t, s_1, l_1)) 
+  
+  like_2 <- apply(data_1, MARGIN = 2, dmvnorm, mean = rep(0, N), 
+                  sigma = get_sigmad(K, t, s_2, l_2)) 
+  # checked: log likelihood
+  zz <- sum(log(pi_1*like_1 + pi_2*like_2))
+  return(zz)
+}
+```
+
+
+
+## Tofino
+Get optimal l data:
+```{r}
+library("dplyr")
+load("tofino_l_opt.RData")
+tofino_l_opt = na.omit(data.frame(tofino_l_opt))
+tofino_l_opt = tofino_l_opt[-1,]
+tofino_l_opt = subset(tofino_l_opt, tofino_l_opt$X3<2)
+tofino_l_opt = subset(tofino_l_opt, tofino_l_opt$X3>0)
+#tofino_l_opt = subset(tofino_l_opt, tofino_l_opt$X5)
+tofino_l_opt = subset(tofino_l_opt, tofino_l_opt$X5<0)
+
+tofino_91 = tofino_l_opt[tofino_l_opt$X1=='1991',]
+tofino_92 = tofino_l_opt[tofino_l_opt$X1=='1992',] 
+tofino_93 = tofino_l_opt[tofino_l_opt$X1=='1993',]
+tofino_94 = tofino_l_opt[tofino_l_opt$X1=='1994',]
+tofino_95 = tofino_l_opt[tofino_l_opt$X1=='1995',]
+tofino_96 = tofino_l_opt[tofino_l_opt$X1=='1996',]
+tofino_97 = tofino_l_opt[tofino_l_opt$X1=='1997',]
+tofino_98 = tofino_l_opt[tofino_l_opt$X1=='1998',]
+tofino_99 = tofino_l_opt[tofino_l_opt$X1=='1999',]
+tofino_00 = tofino_l_opt[tofino_l_opt$X1=='2000',]
+
+l_91 = tofino_91[which.max(tofino_91$X5),]$X5
+l_92 = tofino_92[which.max(tofino_92$X5),]$X5
+l_93 = tofino_93[which.max(tofino_93$X5),]$X5
+l_94 = tofino_94[which.max(tofino_94$X5),]$X5
+l_95 = tofino_95[which.min(tofino_95$X5),]$X5
+l_96 = tofino_96[which.max(tofino_96$X5),]$X5
+l_97 = tofino_97[which.max(tofino_97$X5),]$X5
+l_98 = tofino_98[which.max(tofino_98$X5),]$X5
+l_99 = tofino_99[which.max(tofino_99$X5),]$X5
+l_00 = tofino_00[which.max(tofino_00$X5),]$X5
+```
+
+```{r}
+years1 <- c("1991","1992", "1993", "1994", "1995","1996","1997", "1998", "1999", "2000")
+
+tofino <- read.csv( "./data/Tofino_A.csv") %>% 
+  dplyr::select(Date.Time, Year, Month, Total.Rain..mm.) %>% 
+  mutate(Date.Time = paste0(Date.Time, "-1")) %>% 
+  mutate(Date.Time = myd(Date.Time) ) %>% 
+  mutate(el_nino_season = ifelse(Month %in% c(10, 11, 12, 1, 2, 3), 1, 0))
+
+gp_data_rain <- tofino %>% 
+  filter(Year %in% years1) %>% 
+  dplyr::select(Total.Rain..mm., Year, Month) %>% 
+  spread(Year, Total.Rain..mm.) %>% dplyr::select(-Month) 
+
+
+tofino_seasoned <- (gp_data_rain - rowMeans(gp_data_rain)) %>% 
+  scale() %>% as.data.frame()
+```
+
+
+```{r}
+#setting up parameters for EM
+y = tofino_seasoned
+N <- nrow(y)
+x = 1:N
+ML_solutions = as.numeric(c(l_91, l_92, l_93, l_94, l_95, l_96, l_97, l_98, l_99, l_00))
+```
+
+```{r}
+#randomly initialize parameters
+pi_1 = 0.5
+pi_2 = 1 - pi_1
+
+l_1 = runif(1, 0, 2)
+l_2 = rnorm(1, 0, 2)
+
+#set s_i = 1 for each group
+s_1 <- 1
+s_2 <- 1
+
+#initial covariance matrix
+Sigma_1 = get_sigmad(K, x, l_1, s_1)
+Sigma_2 = get_sigmad(K, x, l_2, s_2)
+
+#loop until converged
+looping = TRUE
+iteration = 1
+
+while(looping){
+  # cluster 1 responsibilities
+  r_j1 <- 
+    (pi_1*apply(y, MARGIN = 2,  dmvnorm, mean = rep(0, N), sigma = Sigma_1, log=F))/
+    (pi_2*apply(y, MARGIN = 2,  dmvnorm, mean = rep(0, N), sigma = Sigma_2, log=F) +
+       pi_1*apply(y, MARGIN = 2,  dmvnorm, mean = rep(0, N), sigma = Sigma_1, log=F))
+  
+  # cluster 2 responsibilities
+  r_j2 <- 
+    (pi_2*apply(y, MARGIN = 2,  dmvnorm, mean = rep(0, N), sigma = Sigma_2, log=F))/
+    (pi_2*apply(y, MARGIN = 2,  dmvnorm, mean = rep(0, N), sigma = Sigma_2, log=F)  +
+       pi_1*apply(y, MARGIN = 2,  dmvnorm, mean = rep(0, N), sigma = Sigma_1, log=F))
+  
+  # compute log likelihood:
+  old = 1
+  for(i in 1:10){
+    g_one = as.numeric((pi_1*dmvnorm(y[,i], mean=rep(0,N), sigma = Sigma_1))^(r_j1[i]))
+    g_two = as.numeric(pi_2*dmvnorm(y[,i], mean=rep(0,N), sigma = Sigma_2)^(r_j2[i]))
+    old = old * (g_one + g_two)
+    if(i == 10){
+      old = log(old)
+    }
+  }
+  
+  # update m_g, m
+  m_g <- 1:2
+  m_g[1] <- sum(r_j1)
+  m_g[2] <- sum(r_j2)
+  
+  # update pi_g
+  pi_1 <- m_g[1]/sum(m_g)
+  pi_2 <- m_g[2]/sum(m_g)
+  
+  # update length parameter
+  l_1 <- sum(r_j1*ML_solutions)/m_g[1]
+  l_2 <- sum(r_j2*ML_solutions)/m_g[2]
+  # correlation parameter not updated = 1
+  
+  #update covariance matrix
+  Sigma_1 = get_sigmad(K, x, l_1, s_1)
+  Sigma_2 = get_sigmad(K, x, l_2, s_2)
+  
+  # new likelihood:
+  updated_log_like = 1
+  for(i in 1:10){
+    g_one = as.numeric((pi_1*dmvnorm(y[,i], mean=rep(0,N), sigma = Sigma_1))^(r_j1[i]))
+    g_two = as.numeric(pi_2*dmvnorm(y[,i], mean=rep(0,N), sigma = Sigma_2)^(r_j2[i]))
+    updated_log_like = updated_log_like * (g_one + g_two)
+    if(i == 10){
+      updated_log_like = log(updated_log_like)
+    }
+  }
+  
+  if(iteration > 1000){
+    # check convergence
+    looping <- ifelse( (abs(old - updated_log_like) > .00001), T, F)
+  }
+    
+  #print details
+  if(iteration %% 100 == 0){
+    print(paste(c("Iteration #", iteration," log-like:",round(updated_log_like, digits=5), " pi 1: ", round(pi_1, digits=3)), collapse = ""))
+  }
+  #print(paste(c("Iteration #", iteration," log-like:",round(updated_log_like, digits=5), " pi 1: ", round(pi_1, digits=3)), collapse = ""))
+  
+  #update iteration
+  iteration = iteration + 1
+}
+```
+
+testing LOG-LIKE
+```{r}
+updated_log_like = 1
+for(i in 1:10){
+  g_one = as.numeric((pi_1*dmvnorm(y[,i], mean=rep(0,N), sigma = Sigma_1))^(r_j1[i]))
+  g_two = as.numeric(pi_2*dmvnorm(y[,i], mean=rep(0,N), sigma = Sigma_2)^(r_j2[i]))
+  updated_log_like = updated_log_like * (g_one + g_two)
+  if(i == 10){
+    updated_log_like = log(updated_log_like)
+  }
+}
+```
